@@ -1,0 +1,309 @@
+openapi: 3.0.3
+info:
+  title: Cloud Between API
+  description: |
+    구름 사이 (Cloud Between) 서비스 API 명세
+    - 도메인 간 격벽(Wall)을 위해 ORM 수준의 연관관계(Join)를 사용하지 않습니다.
+    - 각 도메인은 독립적인 개념(Concept)으로 관리됩니다.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 로컬 서버
+
+paths:
+  /users/signup:
+    post:
+      tags: [User]
+      summary: 회원가입
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: 가입 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /users/login:
+    post:
+      tags: [User]
+      summary: 이메일/비밀번호 로그인
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /users/login/social:
+    post:
+      tags: [User]
+      summary: 소셜 로그인 (없으면 자동 회원가입)
+      description: |
+        소셜 로그인 플로우:
+        1. social_id + provider로 기존 유저 조회
+        2. 있으면 → 로그인 처리 (last_login_at 갱신)
+        3. 없으면 → 자동 회원가입 후 유저 반환
+
+        클라이언트는 가입/로그인 구분 없이 이 엔드포인트 하나만 호출하면 됩니다.
+      operationId: socialLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocialLoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공 (기존 유저)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '201':
+          description: 자동 회원가입 후 로그인 성공 (신규 유저)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: 지원하지 않는 provider 또는 잘못된 요청
+
+  /diagnosis/questions:
+    get:
+      tags: [Diagnosis]
+      summary: 심리 테스트 질문 목록 조회
+      operationId: getQuestions
+      parameters:
+        - name: locale
+          in: query
+          description: 다국어 코드 (ko, en 등)
+          schema:
+            type: string
+            default: ko
+      responses:
+        '200':
+          description: 질문 목록 반환
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuestionResponse'
+
+  /diagnosis/analyze:
+    post:
+      tags: [Diagnosis]
+      summary: 답변 기반 페르소나 진단
+      operationId: analyzeDiagnosis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnosisRequest'
+      responses:
+        '200':
+          description: 진단 결과 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosisResult'
+
+  /chemistries:
+    get:
+      tags: [Chemistry]
+      summary: 전체 궁합 목록 조회 (15개 조합)
+      operationId: getAllChemistries
+      responses:
+        '200':
+          description: 궁합 목록 반환
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChemistryResponse'
+
+  /chemistries/match:
+    get:
+      tags: [Chemistry]
+      summary: 두 페르소나 궁합 조회
+      operationId: getChemistry
+      parameters:
+        - name: type1
+          in: query
+          required: true
+          description: 첫 번째 페르소나 유형 (sunlit, mist, storm, dawn, wild, shade)
+          schema:
+            type: string
+        - name: type2
+          in: query
+          required: true
+          description: 두 번째 페르소나 유형
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 궁합 결과 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChemistryResponse'
+        '400':
+          description: type1, type2 누락
+        '404':
+          description: 해당 조합의 궁합 없음
+
+  /personas/profiles:
+    get:
+      tags: [Persona]
+      summary: 페르소나 유형 상세 정보 조회
+      operationId: getPersonaProfiles
+      parameters:
+        - name: locale
+          in: query
+          schema:
+            type: string
+            default: ko
+      responses:
+        '200':
+          description: 페르소나 프로필 목록 반환
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PersonaProfileResponse'
+
+  /personas/profiles/{typeKey}:
+    get:
+      tags: [Persona]
+      summary: 특정 페르소나 유형 상세 조회
+      operationId: getPersonaProfile
+      parameters:
+        - name: typeKey
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          schema:
+            type: string
+            default: ko
+      responses:
+        '200':
+          description: 페르소나 프로필 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonaProfileResponse'
+
+components:
+  schemas:
+    SignupRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    SocialLoginRequest:
+      type: object
+      required: [socialId, provider, email]
+      properties:
+        socialId: { type: string, description: '소셜 제공자의 고유 ID' }
+        provider:
+          type: string
+          enum: [GOOGLE, APPLE, KAKAO]
+          description: '소셜 로그인 제공자'
+        email: { type: string, format: email }
+
+    UserResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        isPaid: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    DiagnosisRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId: { type: integer }
+              personaType: { type: string }
+
+    DiagnosisResult:
+      type: object
+      properties:
+        personaType: { type: string }
+
+    QuestionResponse:
+      type: object
+      properties:
+        id: { type: integer }
+        questionText: { type: string }
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              text: { type: string }
+              personaType: { type: string }
+        orderIndex: { type: integer }
+
+    ChemistryResponse:
+      type: object
+      properties:
+        personaType1: { type: string }
+        personaType2: { type: string }
+        skyName: { type: string }
+        phenomenon: { type: string }
+        narrative: { type: string }
+        warning: { type: string }
+
+    PersonaProfileResponse:
+      type: object
+      properties:
+        typeKey: { type: string }
+        name: { type: string }
+        emoji: { type: string }
+        subtitle: { type: string }
+        keywords:
+          type: array
+          items: { type: string }
+        lore: { type: string }
+        strengths:
+          type: array
+          items: { type: string }
+        shadows:
+          type: array
+          items: { type: string }
