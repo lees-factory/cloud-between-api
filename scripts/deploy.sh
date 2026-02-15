@@ -10,20 +10,20 @@ cd "$APP_DIR"
 echo "=== Deploy started at $(date) ==="
 
 # 1. Graceful stop
-PID=$(pgrep -x "$APP_NAME" || true)
+PID=$(pgrep -f "./$APP_NAME" || true)
 if [ -n "$PID" ]; then
     echo "Stopping existing process (PID: $PID)..."
     kill -15 $PID || true
     # Wait up to 10 seconds for graceful shutdown
     for i in $(seq 1 10); do
-        if ! pgrep -x "$APP_NAME" > /dev/null 2>&1; then
+        if ! pgrep -f "$APP_NAME" > /dev/null 2>&1; then
             echo "Process stopped."
             break
         fi
         sleep 1
     done
     # Force kill if still running
-    if pgrep -x "$APP_NAME" > /dev/null 2>&1; then
+    if pgrep -f "$APP_NAME" > /dev/null 2>&1; then
         echo "Force killing process..."
         kill -9 $PID || true
         sleep 1

@@ -41,6 +41,14 @@ jobs:
             scripts/deploy.sh \
             ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/cloud-between-api/deploy.sh
 
+          ssh -i ~/.ssh/deploy_key \
+            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} \
+            "mkdir -p /home/ubuntu/cloud-between-api/core/core-api/docs"
+
+          scp -i ~/.ssh/deploy_key \
+            core/core-api/docs/openapi.yaml \
+            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/cloud-between-api/core/core-api/docs/openapi.yaml
+
       - name: Create .env on server
         run: |
           ssh -i ~/.ssh/deploy_key \
