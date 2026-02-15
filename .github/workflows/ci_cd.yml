@@ -31,13 +31,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.LIGHTSAIL_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Create .env file
-        run: |
-          cat > .env <<EOF
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          DB_SCHEMA=${{ secrets.DB_SCHEMA }}
-          EOF
-
       - name: Transfer files
         run: |
           scp -i ~/.ssh/deploy_key \
@@ -45,12 +38,17 @@ jobs:
             ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/cloud-between-api/cloud-between-api.new
 
           scp -i ~/.ssh/deploy_key \
-            .env \
-            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/cloud-between-api/.env
-
-          scp -i ~/.ssh/deploy_key \
             scripts/deploy.sh \
             ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/cloud-between-api/deploy.sh
+
+      - name: Create .env on server
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ secrets.LIGHTSAIL_USER }}@${{ secrets.LIGHTSAIL_HOST }} \
+            "cat > /home/ubuntu/cloud-between-api/.env << 'ENVEOF'
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_SCHEMA=${{ secrets.DB_SCHEMA }}
+          ENVEOF"
 
       - name: Deploy
         run: |
