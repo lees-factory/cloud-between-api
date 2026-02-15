@@ -67,6 +67,26 @@ func main() {
 	// Router setup
 	r := gin.Default()
 
+	// CORS
+	r.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		allowed := map[string]bool{
+			"http://localhost:5173":                  true,
+			"https://www.cloudbetweenus.duckdns.org": true,
+		}
+		if allowed[origin] {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			c.Header("Access-Control-Allow-Credentials", "true")
+		}
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
