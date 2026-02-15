@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 APP_DIR="/home/ubuntu/cloud-between-api"
 APP_NAME="cloud-between-api"
@@ -10,22 +9,20 @@ cd "$APP_DIR"
 echo "=== Deploy started at $(date) ==="
 
 # 1. Graceful stop
-PID=$(pgrep -f "./$APP_NAME" || true)
+PID=$(pidof "$APP_NAME" 2>/dev/null || true)
 if [ -n "$PID" ]; then
     echo "Stopping existing process (PID: $PID)..."
-    kill -15 $PID || true
-    # Wait up to 10 seconds for graceful shutdown
+    kill "$PID" 2>/dev/null || true
     for i in $(seq 1 10); do
-        if ! pgrep -f "$APP_NAME" > /dev/null 2>&1; then
+        if ! pidof "$APP_NAME" > /dev/null 2>&1; then
             echo "Process stopped."
             break
         fi
         sleep 1
     done
-    # Force kill if still running
-    if pgrep -f "$APP_NAME" > /dev/null 2>&1; then
+    if pidof "$APP_NAME" > /dev/null 2>&1; then
         echo "Force killing process..."
-        kill -9 $PID || true
+        kill -9 "$PID" 2>/dev/null || true
         sleep 1
     fi
 else
