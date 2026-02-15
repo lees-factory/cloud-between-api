@@ -53,7 +53,7 @@ echo "Waiting for health check..."
 sleep 3
 
 for i in $(seq 1 5); do
-    if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+    if curl -sf http://localhost:8081/health > /dev/null 2>&1; then
         echo "Health check passed!"
         echo "=== Deploy completed at $(date) ==="
         exit 0
