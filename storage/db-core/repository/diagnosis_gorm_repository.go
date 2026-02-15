@@ -18,30 +18,54 @@ func NewDiagnosisCoreRepository(db *gorm.DB) domain.DiagnosisRepository {
 	return &DiagnosisGormRepository{db: db}
 }
 
-func (r *DiagnosisGormRepository) FindAllQuestions(ctx context.Context, locale string) ([]domain.Question, error) {
-	var entities []entity.QuestionEntity
+func (r *DiagnosisGormRepository) FindAllStepsWithQuestions(ctx context.Context, locale string) ([]domain.Step, error) {
+	// 1. Fetch steps
+	var stepEntities []entity.StepEntity
 	err := r.db.WithContext(ctx).
 		Where("locale = ?", locale).
 		Order("order_index asc").
-		Find(&entities).Error
+		Find(&stepEntities).Error
 	if err != nil {
 		return nil, err
 	}
 
-	questions := make([]domain.Question, len(entities))
-	for i, e := range entities {
+	// 2. Fetch questions
+	var questionEntities []entity.QuestionEntity
+	err = r.db.WithContext(ctx).
+		Where("locale = ?", locale).
+		Order("order_index asc").
+		Find(&questionEntities).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Group questions by step_id
+	questionsByStep := make(map[int][]domain.Question)
+	for _, e := range questionEntities {
 		var options []domain.Option
 		_ = json.Unmarshal(e.Options, &options)
 
-		questions[i] = domain.Question{
+		questionsByStep[e.StepID] = append(questionsByStep[e.StepID], domain.Question{
 			ID:           e.ID,
 			StepID:       e.StepID,
 			QuestionText: e.QuestionText,
 			Options:      options,
 			OrderIndex:   e.OrderIndex,
+		})
+	}
+
+	// 4. Build steps with questions
+	steps := make([]domain.Step, len(stepEntities))
+	for i, s := range stepEntities {
+		steps[i] = domain.Step{
+			ID:        s.ID,
+			Title:     s.Title,
+			Emoji:     s.Emoji,
+			Questions: questionsByStep[s.ID],
 		}
 	}
-	return questions, nil
+
+	return steps, nil
 }
 
 func (r *DiagnosisGormRepository) SaveResult(ctx context.Context, userID *string, personaType string, answers []domain.UserAnswer) error {

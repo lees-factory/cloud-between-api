@@ -4,7 +4,13 @@ import (
 	"context"
 )
 
-// Question represents a diagnostic question
+type Step struct {
+	ID        int
+	Title     string
+	Emoji     string
+	Questions []Question
+}
+
 type Question struct {
 	ID           int
 	StepID       int
@@ -14,21 +20,20 @@ type Question struct {
 }
 
 type Option struct {
-	Text        string `json:"text"`
-	PersonaType string `json:"personaType"`
+	Text      string `json:"text"`
+	CloudType string `json:"cloudType"`
 }
 
 type UserAnswer struct {
-	QuestionID  int    `json:"questionId"`
-	PersonaType string `json:"personaType"`
+	QuestionID int    `json:"questionId"`
+	CloudType  string `json:"cloudType"`
 }
 
-// DiagnosisResult is the result of the persona diagnosis
 type DiagnosisResult struct {
 	PersonaType string `json:"personaType"`
 }
 
 type DiagnosisRepository interface {
-	FindAllQuestions(ctx context.Context, locale string) ([]Question, error)
+	FindAllStepsWithQuestions(ctx context.Context, locale string) ([]Step, error)
 	SaveResult(ctx context.Context, userID *string, personaType string, answers []UserAnswer) error
 }

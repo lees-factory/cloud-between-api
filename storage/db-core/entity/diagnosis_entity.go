@@ -8,6 +8,19 @@ import (
 	"github.com/google/uuid"
 )
 
+// StepEntity for test_steps table
+type StepEntity struct {
+	ID         int    `gorm:"primaryKey"`
+	Title      string `gorm:"not null"`
+	Emoji      string
+	OrderIndex int
+	Locale     string `gorm:"default:ko"`
+}
+
+func (StepEntity) TableName() string {
+	return "cloud_between.test_steps"
+}
+
 // QuestionEntity for test_questions table
 type QuestionEntity struct {
 	ID           int    `gorm:"primaryKey;autoIncrement"`

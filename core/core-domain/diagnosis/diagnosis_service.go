@@ -12,8 +12,8 @@ func NewDiagnosisService(repo DiagnosisRepository) *DiagnosisService {
 	return &DiagnosisService{repo: repo}
 }
 
-func (s *DiagnosisService) GetQuestions(ctx context.Context, locale string) ([]Question, error) {
-	return s.repo.FindAllQuestions(ctx, locale)
+func (s *DiagnosisService) GetSteps(ctx context.Context, locale string) ([]Step, error) {
+	return s.repo.FindAllStepsWithQuestions(ctx, locale)
 }
 
 func (s *DiagnosisService) CalculateResult(ctx context.Context, userID *string, answers []UserAnswer) (*DiagnosisResult, error) {
@@ -22,10 +22,10 @@ func (s *DiagnosisService) CalculateResult(ctx context.Context, userID *string, 
 	dominantType := ""
 
 	for _, ans := range answers {
-		counts[ans.PersonaType]++
-		if counts[ans.PersonaType] > maxCount {
-			maxCount = counts[ans.PersonaType]
-			dominantType = ans.PersonaType
+		counts[ans.CloudType]++
+		if counts[ans.CloudType] > maxCount {
+			maxCount = counts[ans.CloudType]
+			dominantType = ans.CloudType
 		}
 	}
 

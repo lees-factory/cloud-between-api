@@ -3,8 +3,31 @@ info:
   title: Cloud Between API
   description: |
     구름 사이 (Cloud Between) 서비스 API 명세
+
+    ## 서비스 개요
+    "구름 사이"는 하늘과 구름을 테마로 한 심리 진단 서비스입니다.
+    사용자는 12단계의 심리 테스트를 통해 자신의 구름 페르소나(Cloud Type)를 발견하고,
+    다른 구름 유형과의 궁합(Chemistry)을 확인할 수 있습니다.
+
+    ## 6가지 구름 유형 (Cloud Types)
+    | Type Key | 이름 | 설명 |
+    |----------|------|------|
+    | `sunlit` | 햇살 구름 | 밝고 따뜻한 에너지, 주변을 환하게 만드는 존재 |
+    | `mist` | 안개 구름 | 신비롭고 조용한 분위기, 깊은 내면의 세계 |
+    | `storm` | 폭풍 구름 | 강렬한 감정과 에너지, 변화를 이끄는 힘 |
+    | `dawn` | 새벽 구름 | 희망적이고 새로운 시작, 잔잔한 영감 |
+    | `shade` | 그늘 구름 | 차분하고 보호적인 성향, 안정감을 주는 존재 |
+    | `wild` | 야생 구름 | 자유롭고 예측 불가능, 창의적인 에너지 |
+
+    ## 주요 플로우
+    1. **심리 진단** (`/diagnosis`): 12단계 질문 → 답변 제출 → 구름 유형 결과
+    2. **페르소나 조회** (`/personas`): 각 구름 유형의 상세 프로필 확인
+    3. **궁합 조회** (`/chemistries`): 두 구름 유형 간의 관계성 확인
+
+    ## 아키텍처 원칙
     - 도메인 간 격벽(Wall)을 위해 ORM 수준의 연관관계(Join)를 사용하지 않습니다.
     - 각 도메인은 독립적인 개념(Concept)으로 관리됩니다.
+    - 비회원도 진단 테스트를 수행할 수 있으며, 회원은 결과가 저장됩니다.
   version: 1.0.0
 servers:
   - url: https://cloud-between.duckdns.org/api/v1
@@ -12,11 +35,36 @@ servers:
   - url: http://localhost:8081/api/v1
     description: 로컬 서버
 
+tags:
+  - name: Diagnosis
+    description: |
+      심리 진단 API.
+      12단계(Step)로 구성된 구름 성격 진단 테스트를 제공합니다.
+      각 단계에는 여러 질문이 포함되어 있으며, 프론트엔드에서 단계별로 랜덤 질문을 선택하여 보여줍니다.
+      비회원도 진단 가능하며, 로그인한 회원의 결과는 서버에 저장됩니다.
+  - name: Persona
+    description: |
+      페르소나 프로필 API.
+      6가지 구름 유형(sunlit, mist, storm, dawn, shade, wild)의 상세 프로필 정보를 제공합니다.
+      각 프로필에는 이름, 이모지, 부제목, 키워드, 로어(설명), 강점, 그림자(약점) 정보가 포함됩니다.
+      다국어(locale) 지원으로 한국어(ko), 영어(en) 등의 컨텐츠를 제공합니다.
+  - name: Chemistry
+    description: |
+      궁합 API.
+      두 구름 유형 간의 관계성과 궁합 정보를 제공합니다.
+      6가지 유형의 모든 조합(15개)에 대해 하늘 이름, 현상, 서사, 주의사항 등의 궁합 데이터를 반환합니다.
+      예: sunlit + storm = "번개가 치는 햇살 하늘"
+  - name: User
+    description: |
+      사용자 인증 API.
+      이메일/비밀번호 회원가입, 로그인, 소셜 로그인(Google, Apple, Kakao)을 지원합니다.
+
 paths:
   /users/signup:
     post:
       tags: [User]
       summary: 회원가입
+      description: 이메일과 비밀번호로 신규 계정을 생성합니다.
       operationId: signup
       requestBody:
         required: true
@@ -36,6 +84,7 @@ paths:
     post:
       tags: [User]
       summary: 이메일/비밀번호 로그인
+      description: 등록된 이메일과 비밀번호로 로그인합니다.
       operationId: login
       requestBody:
         required: true
@@ -88,77 +137,198 @@ paths:
   /diagnosis/questions:
     get:
       tags: [Diagnosis]
-      summary: 심리 테스트 질문 목록 조회
+      summary: 심리 테스트 질문 목록 조회 (단계별)
+      description: |
+        12단계로 구성된 심리 테스트 질문을 단계(Step) 단위로 반환합니다.
+
+        **응답 구조**: Step[] → 각 Step 안에 Question[] → 각 Question 안에 Option[]
+
+        **프론트엔드 사용 방식**:
+        - 각 Step에 포함된 questions 배열에서 랜덤으로 1개의 질문을 선택하여 사용자에게 표시
+        - 총 12단계이므로, 사용자는 12개의 질문에 답변하게 됩니다
+        - 각 질문의 선택지(options)에는 cloudType이 포함되어 있어 답변 집계에 사용됩니다
+
+        **인증**: 불필요 (비회원도 조회 가능)
       operationId: getQuestions
       parameters:
         - name: locale
           in: query
-          description: 다국어 코드 (ko, en 등)
+          description: |
+            다국어 코드. 해당 언어로 작성된 질문/선택지를 반환합니다.
+            현재 지원: `ko` (한국어), `en` (영어)
           schema:
             type: string
             default: ko
+            enum: [ko, en]
       responses:
         '200':
-          description: 질문 목록 반환
+          description: 단계별 질문 목록 반환
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/QuestionResponse'
+                  $ref: '#/components/schemas/StepResponse'
+              example:
+                - id: 1
+                  title: "감정 표현"
+                  emoji: "💭"
+                  questions:
+                    - id: 1
+                      text: "기분이 안 좋을 때 나는..."
+                      options:
+                        - text: "밝은 척 웃으며 넘긴다"
+                          cloudType: "sunlit"
+                        - text: "혼자 조용히 삭인다"
+                          cloudType: "mist"
+                        - text: "화를 바로 표현한다"
+                          cloudType: "storm"
+                        - text: "일기에 쓰거나 정리한다"
+                          cloudType: "dawn"
+                    - id: 2
+                      text: "감정을 표현할 때 나는..."
+                      options:
+                        - text: "표정으로 다 드러난다"
+                          cloudType: "sunlit"
+                        - text: "글이나 예술로 표현한다"
+                          cloudType: "mist"
 
   /diagnosis/analyze:
     post:
       tags: [Diagnosis]
-      summary: 답변 기반 페르소나 진단
+      summary: 답변 기반 구름 유형 진단
+      description: |
+        사용자의 답변(12개)을 분석하여 가장 많이 선택된 구름 유형(cloudType)을 결과로 반환합니다.
+
+        **진단 로직**:
+        1. 각 답변의 cloudType을 집계합니다
+        2. 가장 많이 선택된 cloudType이 최종 결과가 됩니다
+        3. 결과의 personaType 필드로 반환됩니다
+
+        **결과 저장**:
+        - Authorization 헤더가 있는 경우(로그인 유저): 진단 결과가 DB에 저장됩니다
+        - Authorization 헤더가 없는 경우(비회원): 결과만 반환하고 저장하지 않습니다
+
+        **인증**: 선택적 (비회원도 진단 가능, 회원은 결과 저장)
       operationId: analyzeDiagnosis
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          description: |
+            로그인 유저의 인증 토큰 (Bearer).
+            있으면 진단 결과를 서버에 저장합니다. 없으면 결과만 반환합니다.
+          schema:
+            type: string
+            example: "Bearer eyJhbGciOiJIUzI1NiIs..."
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/DiagnosisRequest'
+            example:
+              answers:
+                - questionId: 1
+                  cloudType: "sunlit"
+                - questionId: 5
+                  cloudType: "mist"
+                - questionId: 9
+                  cloudType: "sunlit"
+                - questionId: 13
+                  cloudType: "storm"
+                - questionId: 17
+                  cloudType: "sunlit"
+                - questionId: 21
+                  cloudType: "dawn"
+                - questionId: 25
+                  cloudType: "sunlit"
+                - questionId: 29
+                  cloudType: "shade"
+                - questionId: 33
+                  cloudType: "wild"
+                - questionId: 37
+                  cloudType: "sunlit"
+                - questionId: 41
+                  cloudType: "mist"
+                - questionId: 45
+                  cloudType: "sunlit"
       responses:
         '200':
-          description: 진단 결과 반환
+          description: |
+            진단 결과 반환. personaType 필드에 가장 많이 선택된 구름 유형이 담깁니다.
+            이 값으로 `/personas/profiles/{typeKey}` API를 호출하면 상세 프로필을 확인할 수 있습니다.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DiagnosisResult'
+              example:
+                personaType: "sunlit"
+        '400':
+          description: 잘못된 요청 (answers 누락 또는 형식 오류)
 
   /chemistries:
     get:
       tags: [Chemistry]
       summary: 전체 궁합 목록 조회 (15개 조합)
+      description: |
+        6가지 구름 유형 간 가능한 모든 궁합 조합(15개)을 반환합니다.
+
+        **조합 수**: 6C2 = 15가지 (sunlit-mist, sunlit-storm, ... , shade-wild)
+
+        각 궁합에는 두 유형이 만났을 때의 하늘 이름(skyName), 자연 현상(phenomenon),
+        서사(narrative), 주의사항(warning) 정보가 포함됩니다.
+
+        **사용 사례**:
+        - 전체 궁합표 렌더링
+        - 궁합 카드 리스트 화면
       operationId: getAllChemistries
       responses:
         '200':
-          description: 궁합 목록 반환
+          description: 전체 궁합 목록 (15개)
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/ChemistryResponse'
+              example:
+                - personaType1: "sunlit"
+                  personaType2: "mist"
+                  skyName: "무지개 안개 하늘"
+                  phenomenon: "안개 속에서 빛이 퍼지며 무지개가 피어남"
+                  narrative: "밝은 에너지와 고요한 감성이 만나 서로에게 새로운 색을 입혀준다"
+                  warning: "서로의 속도 차이를 인정해야 한다"
 
   /chemistries/match:
     get:
       tags: [Chemistry]
-      summary: 두 페르소나 궁합 조회
+      summary: 두 구름 유형의 궁합 조회
+      description: |
+        특정 두 구름 유형의 궁합 정보를 조회합니다.
+        type1과 type2의 순서는 무관합니다 (sunlit+mist = mist+sunlit).
+
+        **사용 사례**:
+        - 진단 결과 후 친구와의 궁합 확인
+        - 두 유형을 선택하여 궁합 상세 보기
       operationId: getChemistry
       parameters:
         - name: type1
           in: query
           required: true
-          description: 첫 번째 페르소나 유형 (sunlit, mist, storm, dawn, wild, shade)
+          description: 첫 번째 구름 유형
           schema:
             type: string
+            enum: [sunlit, mist, storm, dawn, shade, wild]
+          example: sunlit
         - name: type2
           in: query
           required: true
-          description: 두 번째 페르소나 유형
+          description: 두 번째 구름 유형
           schema:
             type: string
+            enum: [sunlit, mist, storm, dawn, shade, wild]
+          example: mist
       responses:
         '200':
           description: 궁합 결과 반환
@@ -167,24 +337,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChemistryResponse'
         '400':
-          description: type1, type2 누락
+          description: type1 또는 type2 누락
         '404':
-          description: 해당 조합의 궁합 없음
+          description: 해당 조합의 궁합 데이터가 존재하지 않음
 
   /personas/profiles:
     get:
       tags: [Persona]
-      summary: 페르소나 유형 상세 정보 조회
+      summary: 전체 페르소나 프로필 목록 조회
+      description: |
+        6가지 구름 유형의 상세 프로필 정보를 모두 반환합니다.
+
+        각 프로필에는 다음 정보가 포함됩니다:
+        - **typeKey**: 구름 유형 식별자 (sunlit, mist, storm, dawn, shade, wild)
+        - **name**: 구름 유형의 한글 이름 (예: "햇살 구름")
+        - **emoji**: 대표 이모지 (예: "☀️")
+        - **subtitle**: 한 줄 설명
+        - **keywords**: 성격 키워드 배열 (예: ["밝은", "따뜻한", "사교적인"])
+        - **lore**: 구름 유형에 대한 서사/설명
+        - **strengths**: 강점 목록
+        - **shadows**: 그림자(약점) 목록
+
+        **사용 사례**:
+        - 전체 구름 유형 소개 페이지
+        - 진단 결과 후 모든 유형 비교 화면
       operationId: getPersonaProfiles
       parameters:
         - name: locale
           in: query
+          description: |
+            다국어 코드. 해당 언어의 프로필 컨텐츠를 반환합니다.
+            현재 지원: `ko` (한국어), `en` (영어)
           schema:
             type: string
             default: ko
+            enum: [ko, en]
       responses:
         '200':
-          description: 페르소나 프로필 목록 반환
+          description: 6가지 구름 유형의 프로필 목록
           content:
             application/json:
               schema:
@@ -195,117 +385,276 @@ paths:
   /personas/profiles/{typeKey}:
     get:
       tags: [Persona]
-      summary: 특정 페르소나 유형 상세 조회
+      summary: 특정 구름 유형 프로필 조회
+      description: |
+        특정 구름 유형의 상세 프로필 정보를 반환합니다.
+        진단 결과로 받은 personaType 값을 typeKey로 사용하여 상세 정보를 조회할 수 있습니다.
+
+        **사용 사례**:
+        - 진단 결과 화면에서 해당 유형의 상세 프로필 표시
+        - 특정 구름 유형 상세 페이지
       operationId: getPersonaProfile
       parameters:
         - name: typeKey
           in: path
           required: true
+          description: 구름 유형 식별자
           schema:
             type: string
+            enum: [sunlit, mist, storm, dawn, shade, wild]
+          example: sunlit
         - name: locale
           in: query
+          description: |
+            다국어 코드. 해당 언어의 프로필 컨텐츠를 반환합니다.
+            현재 지원: `ko` (한국어), `en` (영어)
           schema:
             type: string
             default: ko
+            enum: [ko, en]
       responses:
         '200':
-          description: 페르소나 프로필 반환
+          description: 해당 구름 유형의 프로필 정보
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PersonaProfileResponse'
+        '404':
+          description: 해당 typeKey의 페르소나를 찾을 수 없음
 
 components:
   schemas:
+    CloudType:
+      type: string
+      enum: [sunlit, mist, storm, dawn, shade, wild]
+      description: |
+        구름 유형 식별자.
+        - `sunlit`: 햇살 구름 - 밝고 따뜻한 에너지
+        - `mist`: 안개 구름 - 신비롭고 조용한 분위기
+        - `storm`: 폭풍 구름 - 강렬한 감정과 에너지
+        - `dawn`: 새벽 구름 - 희망적이고 새로운 시작
+        - `shade`: 그늘 구름 - 차분하고 보호적인 성향
+        - `wild`: 야생 구름 - 자유롭고 예측 불가능
+
     SignupRequest:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email }
-        password: { type: string, minLength: 8 }
+        email:
+          type: string
+          format: email
+          description: 가입할 이메일 주소
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          description: 비밀번호 (최소 8자)
 
     LoginRequest:
       type: object
       required: [email, password]
       properties:
-        email: { type: string }
-        password: { type: string }
+        email:
+          type: string
+          format: email
+          description: 로그인 이메일
+          example: "user@example.com"
+        password:
+          type: string
+          description: 비밀번호
 
     SocialLoginRequest:
       type: object
       required: [socialId, provider, email]
       properties:
-        socialId: { type: string, description: '소셜 제공자의 고유 ID' }
+        socialId:
+          type: string
+          description: 소셜 제공자에서 발급한 고유 사용자 ID
+          example: "1234567890"
         provider:
           type: string
           enum: [GOOGLE, APPLE, KAKAO]
-          description: '소셜 로그인 제공자'
-        email: { type: string, format: email }
+          description: 소셜 로그인 제공자
+        email:
+          type: string
+          format: email
+          description: 소셜 계정에 연결된 이메일
+          example: "user@gmail.com"
 
     UserResponse:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        email: { type: string }
-        isPaid: { type: boolean }
-        createdAt: { type: string, format: date-time }
+        id:
+          type: string
+          format: uuid
+          description: 사용자 고유 ID
+        email:
+          type: string
+          description: 이메일 주소
+        isPaid:
+          type: boolean
+          description: 유료 회원 여부
+        createdAt:
+          type: string
+          format: date-time
+          description: 가입 일시
+
+    StepResponse:
+      type: object
+      description: |
+        진단 테스트의 한 단계(Step).
+        총 12단계로 구성되며, 각 단계에는 여러 질문이 포함됩니다.
+        프론트엔드에서는 각 단계의 questions 중 랜덤 1개를 선택하여 표시합니다.
+      properties:
+        id:
+          type: integer
+          description: 단계 ID (1~12)
+          example: 1
+        title:
+          type: string
+          description: 단계 제목 (해당 단계의 주제)
+          example: "감정 표현"
+        emoji:
+          type: string
+          description: 단계를 대표하는 이모지
+          example: "💭"
+        questions:
+          type: array
+          description: 해당 단계에 속한 질문 목록 (이 중 랜덤 1개를 선택하여 사용)
+          items:
+            $ref: '#/components/schemas/QuestionResponse'
+
+    QuestionResponse:
+      type: object
+      description: 개별 질문. 각 질문에는 4개의 선택지가 포함되며, 각 선택지는 특정 구름 유형과 매핑됩니다.
+      properties:
+        id:
+          type: integer
+          description: 질문 고유 ID
+          example: 1
+        text:
+          type: string
+          description: 질문 본문
+          example: "기분이 안 좋을 때 나는..."
+        options:
+          type: array
+          description: 선택지 목록 (보통 4개, 각각 다른 cloudType에 매핑)
+          items:
+            $ref: '#/components/schemas/OptionResponse'
+
+    OptionResponse:
+      type: object
+      description: 질문의 선택지. 각 선택지를 선택하면 해당 cloudType에 1점이 부여됩니다.
+      properties:
+        text:
+          type: string
+          description: 선택지 텍스트
+          example: "밝은 척 웃으며 넘긴다"
+        cloudType:
+          $ref: '#/components/schemas/CloudType'
 
     DiagnosisRequest:
       type: object
       required: [answers]
+      description: |
+        진단 분석 요청. 12개의 답변(각 단계에서 1개씩)을 배열로 전달합니다.
+        각 답변에는 선택한 질문의 ID와 해당 선택지의 cloudType을 포함합니다.
       properties:
         answers:
           type: array
+          description: 사용자 답변 배열 (12개)
+          minItems: 12
+          maxItems: 12
           items:
-            type: object
-            properties:
-              questionId: { type: integer }
-              personaType: { type: string }
+            $ref: '#/components/schemas/UserAnswer'
+
+    UserAnswer:
+      type: object
+      required: [questionId, cloudType]
+      description: 개별 답변. 어떤 질문에서 어떤 구름 유형을 선택했는지를 나타냅니다.
+      properties:
+        questionId:
+          type: integer
+          description: 응답한 질문의 ID
+          example: 1
+        cloudType:
+          $ref: '#/components/schemas/CloudType'
 
     DiagnosisResult:
       type: object
+      description: |
+        진단 결과. 12개의 답변에서 가장 많이 선택된 구름 유형이 최종 결과로 반환됩니다.
+        이 personaType 값으로 `/personas/profiles/{typeKey}` API를 호출하면 상세 프로필을 확인할 수 있습니다.
       properties:
-        personaType: { type: string }
-
-    QuestionResponse:
-      type: object
-      properties:
-        id: { type: integer }
-        questionText: { type: string }
-        options:
-          type: array
-          items:
-            type: object
-            properties:
-              text: { type: string }
-              personaType: { type: string }
-        orderIndex: { type: integer }
+        personaType:
+          $ref: '#/components/schemas/CloudType'
 
     ChemistryResponse:
       type: object
+      description: |
+        두 구름 유형 간의 궁합 정보.
+        두 유형이 만났을 때 어떤 하늘이 펼쳐지는지를 자연 현상 메타포로 표현합니다.
       properties:
-        personaType1: { type: string }
-        personaType2: { type: string }
-        skyName: { type: string }
-        phenomenon: { type: string }
-        narrative: { type: string }
-        warning: { type: string }
+        personaType1:
+          $ref: '#/components/schemas/CloudType'
+        personaType2:
+          $ref: '#/components/schemas/CloudType'
+        skyName:
+          type: string
+          description: 두 구름이 만들어내는 하늘의 이름
+          example: "무지개 안개 하늘"
+        phenomenon:
+          type: string
+          description: 두 구름이 만났을 때 나타나는 자연 현상 묘사
+          example: "안개 속에서 빛이 퍼지며 무지개가 피어남"
+        narrative:
+          type: string
+          description: 두 유형의 관계에 대한 서사적 설명
+          example: "밝은 에너지와 고요한 감성이 만나 서로에게 새로운 색을 입혀준다"
+        warning:
+          type: string
+          description: 이 궁합에서 주의해야 할 점 (없을 수 있음)
+          example: "서로의 속도 차이를 인정해야 한다"
 
     PersonaProfileResponse:
       type: object
+      description: |
+        구름 유형의 상세 프로필.
+        진단 결과 또는 유형 소개 화면에서 사용됩니다.
       properties:
-        typeKey: { type: string }
-        name: { type: string }
-        emoji: { type: string }
-        subtitle: { type: string }
+        typeKey:
+          $ref: '#/components/schemas/CloudType'
+        name:
+          type: string
+          description: 구름 유형의 표시 이름
+          example: "햇살 구름"
+        emoji:
+          type: string
+          description: 대표 이모지
+          example: "☀️"
+        subtitle:
+          type: string
+          description: 한 줄 소개
+          example: "세상을 밝게 비추는 따뜻한 빛"
         keywords:
           type: array
-          items: { type: string }
-        lore: { type: string }
+          description: 성격 키워드 (3~5개)
+          items:
+            type: string
+          example: ["밝은", "따뜻한", "사교적인", "낙천적인"]
+        lore:
+          type: string
+          description: 구름 유형에 대한 서사적 설명 (세계관 기반)
+          example: "하늘 위에서 가장 먼저 빛을 받아들이는 구름..."
         strengths:
           type: array
-          items: { type: string }
+          description: 이 유형의 강점 목록
+          items:
+            type: string
+          example: ["사람들에게 에너지를 줌", "어디서든 분위기를 밝힘"]
         shadows:
           type: array
-          items: { type: string }
+          description: 이 유형의 그림자(약점) 목록
+          items:
+            type: string
+          example: ["자신의 감정을 숨기는 경향", "무리해서라도 밝게 행동함"]
