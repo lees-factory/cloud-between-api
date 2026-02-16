@@ -2,6 +2,7 @@ package chemistry
 
 import (
 	"context"
+	"encoding/json"
 )
 
 type Chemistry struct {
@@ -9,9 +10,11 @@ type Chemistry struct {
 	PersonaType1 string
 	PersonaType2 string
 	SkyName      string
+	SkyNameKo    string
 	Phenomenon   string
 	Narrative    string
 	Warning      string
+	Content      json.RawMessage
 }
 
 type ChemistryRepository interface {

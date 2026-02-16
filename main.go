@@ -14,6 +14,8 @@ import (
 	"io.lees.cloud-between/core/core-domain/chemistry"
 	"io.lees.cloud-between/core/core-domain/diagnosis"
 	"io.lees.cloud-between/core/core-domain/persona"
+	"io.lees.cloud-between/core/core-domain/premiumcard"
+	"io.lees.cloud-between/core/core-domain/translation"
 	"io.lees.cloud-between/core/core-domain/user"
 	"io.lees.cloud-between/storage/db-core/repository"
 )
@@ -43,6 +45,8 @@ func main() {
 	diagnosisRepository := repository.NewDiagnosisCoreRepository(db)
 	chemistryRepository := repository.NewChemistryCoreRepository(db)
 	personaProfileRepository := repository.NewPersonaProfileCoreRepository(db)
+	translationRepository := repository.NewTranslationCoreRepository(db)
+	premiumCardRepository := repository.NewPremiumCardCoreRepository(db)
 
 	// Domains
 	userAppender := user.NewUserAppender(userRepository)
@@ -58,11 +62,19 @@ func main() {
 	personaProfileFinder := persona.NewPersonaProfileFinder(personaProfileRepository)
 	personaProfileService := persona.NewPersonaProfileService(personaProfileFinder)
 
+	translationFinder := translation.NewTranslationFinder(translationRepository)
+	translationService := translation.NewTranslationService(translationFinder)
+
+	premiumCardFinder := premiumcard.NewPremiumCardFinder(premiumCardRepository)
+	premiumCardService := premiumcard.NewPremiumCardService(premiumCardFinder)
+
 	// Presentation Layer
 	userController := v1.NewUserController(userService)
 	diagnosisController := v1.NewDiagnosisController(diagnosisService)
 	chemistryController := v1.NewChemistryController(chemistryService)
 	personaProfileController := v1.NewPersonaProfileController(personaProfileService)
+	translationController := v1.NewTranslationController(translationService)
+	premiumCardController := v1.NewPremiumCardController(premiumCardService)
 
 	// Router setup
 	r := gin.Default()
@@ -130,6 +142,18 @@ func main() {
 		{
 			personaGroup.GET("/profiles", personaProfileController.GetProfiles)
 			personaGroup.GET("/profiles/:typeKey", personaProfileController.GetProfile)
+		}
+
+		translationGroup := apiV1.Group("/translations")
+		{
+			translationGroup.GET("", translationController.GetAll)
+			translationGroup.GET("/:namespace", translationController.GetByNamespace)
+		}
+
+		premiumCardGroup := apiV1.Group("/premium-cards")
+		{
+			premiumCardGroup.GET("", premiumCardController.GetAll)
+			premiumCardGroup.GET("/:category", premiumCardController.GetByCategory)
 		}
 	}
 

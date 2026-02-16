@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -49,21 +50,47 @@ func (ctrl *ChemistryController) GetAllChemistries(c *gin.Context) {
 }
 
 type chemistryResponse struct {
-	PersonaType1 string `json:"personaType1"`
-	PersonaType2 string `json:"personaType2"`
-	SkyName      string `json:"skyName"`
-	Phenomenon   string `json:"phenomenon"`
-	Narrative    string `json:"narrative"`
-	Warning      string `json:"warning,omitempty"`
+	PersonaType1   string                 `json:"personaType1"`
+	PersonaType2   string                 `json:"personaType2"`
+	SkyName        string                 `json:"skyName"`
+	SkyNameKo      string                 `json:"skyNameKo,omitempty"`
+	Phenomenon     string                 `json:"phenomenon"`
+	Narrative      string                 `json:"narrative"`
+	Warning        string                 `json:"warning,omitempty"`
+	PhenomenonName map[string]string      `json:"phenomenonName,omitempty"`
+	VibeTags       map[string][]string    `json:"vibeTags,omitempty"`
+	StoryBeats     map[string]interface{} `json:"storyBeats,omitempty"`
+	Premium        map[string]interface{} `json:"premium,omitempty"`
 }
 
 func toChemistryResponse(c chemistry.Chemistry) chemistryResponse {
-	return chemistryResponse{
+	resp := chemistryResponse{
 		PersonaType1: c.PersonaType1,
 		PersonaType2: c.PersonaType2,
 		SkyName:      c.SkyName,
+		SkyNameKo:    c.SkyNameKo,
 		Phenomenon:   c.Phenomenon,
 		Narrative:    c.Narrative,
 		Warning:      c.Warning,
 	}
+
+	if len(c.Content) > 0 {
+		var content map[string]json.RawMessage
+		if err := json.Unmarshal(c.Content, &content); err == nil {
+			if raw, ok := content["phenomenonName"]; ok {
+				json.Unmarshal(raw, &resp.PhenomenonName)
+			}
+			if raw, ok := content["vibeTags"]; ok {
+				json.Unmarshal(raw, &resp.VibeTags)
+			}
+			if raw, ok := content["storyBeats"]; ok {
+				json.Unmarshal(raw, &resp.StoryBeats)
+			}
+			if raw, ok := content["premium"]; ok {
+				json.Unmarshal(raw, &resp.Premium)
+			}
+		}
+	}
+
+	return resp
 }

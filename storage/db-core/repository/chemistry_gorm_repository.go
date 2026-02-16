@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 
 	"gorm.io/gorm"
 	domain "io.lees.cloud-between/core/core-domain/chemistry"
@@ -50,8 +51,10 @@ func toChemistryDomain(e entity.ChemistryMatrixEntity) domain.Chemistry {
 		PersonaType1: e.PersonaType1,
 		PersonaType2: e.PersonaType2,
 		SkyName:      e.SkyName,
+		SkyNameKo:    e.SkyNameKo,
 		Phenomenon:   e.Phenomenon,
 		Narrative:    e.Narrative,
 		Warning:      e.Warning,
+		Content:      json.RawMessage(e.Content),
 	}
 }
