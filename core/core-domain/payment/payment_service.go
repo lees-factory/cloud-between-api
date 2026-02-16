@@ -67,16 +67,19 @@ func (s *PaymentService) CaptureOrder(ctx context.Context, orderID string) error
 	return nil
 }
 
-// CancelOrder records a cancellation for the given order.
+// CancelOrder records a cancellation for a COMPLETED payment.
+// Only COMPLETED payments can be cancelled. PENDING payments are payment errors, not cancellation targets.
 func (s *PaymentService) CancelOrder(ctx context.Context, orderID, reason string) error {
-	var paymentID *uuid.UUID
-
 	p, err := s.paymentRepository.FindByOrderID(ctx, orderID)
-	if err == nil {
-		paymentID = &p.ID
+	if err != nil {
+		return fmt.Errorf("payment not found for order %s: %w", orderID, err)
 	}
 
-	cancel := NewPaymentCancel(paymentID, orderID, reason)
+	if p.Status != PaymentStatusCompleted {
+		return fmt.Errorf("only completed payments can be cancelled, current status: %s", p.Status)
+	}
+
+	cancel := NewPaymentCancel(p.ID, orderID, reason)
 	if err := s.cancelRepository.Save(ctx, cancel); err != nil {
 		return fmt.Errorf("failed to save payment cancellation: %w", err)
 	}

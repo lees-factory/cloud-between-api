@@ -9,13 +9,13 @@ import (
 
 type PaymentCancel struct {
 	ID        uuid.UUID
-	PaymentID *uuid.UUID
+	PaymentID uuid.UUID
 	OrderID   string
 	Reason    string
 	CreatedAt time.Time
 }
 
-func NewPaymentCancel(paymentID *uuid.UUID, orderID, reason string) *PaymentCancel {
+func NewPaymentCancel(paymentID uuid.UUID, orderID, reason string) *PaymentCancel {
 	return &PaymentCancel{
 		ID:        uuid.New(),
 		PaymentID: paymentID,

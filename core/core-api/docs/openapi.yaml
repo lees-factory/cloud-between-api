@@ -81,12 +81,12 @@ tags:
       1. 클라이언트에서 `POST /payments/create` 호출 → orderId, approveUrl 수신
       2. PayPal JS SDK로 사용자 승인 (approveUrl 또는 SDK 내장 UI)
       3. 승인 완료 후 `POST /payments/capture` 호출 → 결제 확정
-      4. 사용자 취소 시 `POST /payments/cancel` 호출 → 취소 기록
+      4. 결제 완료 후 취소 시 `POST /payments/cancel` 호출 → 취소 기록
 
       **상태 관리**:
-      - `PENDING`: 주문 생성 후 결제 대기 (실패 시에도 유지)
+      - `PENDING`: 주문 생성 후 결제 대기 (결제 오류/미완료 시 유지)
       - `COMPLETED`: 결제 확정 완료
-      - 취소는 `payment_cancels` 테이블에 별도 기록
+      - 취소는 COMPLETED 상태의 결제만 가능하며, `payment_cancels` 테이블에 별도 기록
 
 paths:
   /users/signup:
@@ -704,10 +704,11 @@ paths:
       tags: [Payment]
       summary: 결제 취소 기록
       description: |
-        사용자가 PayPal 결제를 취소한 경우 취소 사유를 기록합니다.
-        결제 상태는 PENDING을 유지하며, `payment_cancels` 테이블에 별도 기록됩니다.
+        COMPLETED 상태의 결제에 대해 취소 사유를 기록합니다.
+        `payment_cancels` 테이블에 별도 기록되며, PENDING 상태의 결제는 취소할 수 없습니다.
+        (PENDING은 결제 오류/미완료 상태이므로 취소 대상이 아닙니다.)
 
-        **호출 시점**: PayPal JS SDK의 `onCancel` 콜백에서 호출
+        **호출 시점**: 결제 완료(COMPLETED) 후 사용자가 취소를 요청할 때 호출
       operationId: cancelPaymentOrder
       requestBody:
         required: true
@@ -728,6 +729,10 @@ paths:
                     example: "payment cancellation recorded"
         '400':
           description: 잘못된 요청 (orderId 누락)
+        '404':
+          description: 해당 orderId의 결제를 찾을 수 없음
+        '422':
+          description: COMPLETED 상태가 아닌 결제는 취소할 수 없음
 
 components:
   schemas:

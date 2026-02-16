@@ -19,9 +19,9 @@ func (PaymentEntity) TableName() string {
 
 type PaymentCancelEntity struct {
 	BaseEntity
-	PaymentID *uuid.UUID `gorm:"type:uuid"`
-	OrderID   string     `gorm:"not null;size:100"`
-	Reason    string     `gorm:"type:text"`
+	PaymentID uuid.UUID `gorm:"type:uuid;not null"`
+	OrderID   string    `gorm:"not null;size:100"`
+	Reason    string    `gorm:"type:text"`
 }
 
 func (PaymentCancelEntity) TableName() string {
