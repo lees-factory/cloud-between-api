@@ -72,6 +72,21 @@ tags:
     description: |
       사용자 인증 API.
       이메일/비밀번호 회원가입, 로그인, 소셜 로그인(Google, Apple, Kakao)을 지원합니다.
+  - name: Payment
+    description: |
+      결제 API.
+      PayPal JS SDK 기반 결제 플로우를 지원합니다.
+
+      **결제 플로우**:
+      1. 클라이언트에서 `POST /payments/create` 호출 → orderId, approveUrl 수신
+      2. PayPal JS SDK로 사용자 승인 (approveUrl 또는 SDK 내장 UI)
+      3. 승인 완료 후 `POST /payments/capture` 호출 → 결제 확정
+      4. 사용자 취소 시 `POST /payments/cancel` 호출 → 취소 기록
+
+      **상태 관리**:
+      - `PENDING`: 주문 생성 후 결제 대기 (실패 시에도 유지)
+      - `COMPLETED`: 결제 확정 완료
+      - 취소는 `payment_cancels` 테이블에 별도 기록
 
 paths:
   /users/signup:
@@ -623,6 +638,97 @@ paths:
         '404':
           description: 해당 typeKey의 페르소나를 찾을 수 없음
 
+  /payments/create:
+    post:
+      tags: [Payment]
+      summary: 결제 주문 생성
+      description: |
+        PayPal 주문을 생성하고, 사용자가 결제를 승인할 수 있는 URL을 반환합니다.
+        서버에 PENDING 상태의 결제 레코드가 저장됩니다.
+
+        **프론트엔드 사용 방식**:
+        1. 이 API 호출 → orderId, approveUrl 수신
+        2. PayPal JS SDK의 `createOrder` 콜백에서 orderId 반환
+        3. 사용자가 PayPal 결제 승인 후 `onApprove` 콜백에서 `/payments/capture` 호출
+      operationId: createPaymentOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: 주문 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePaymentResponse'
+        '400':
+          description: 잘못된 요청 (필수 필드 누락 또는 잘못된 userId)
+
+  /payments/capture:
+    post:
+      tags: [Payment]
+      summary: 결제 확정 (Capture)
+      description: |
+        사용자가 PayPal에서 승인한 주문을 확정(Capture)합니다.
+        성공 시 결제 상태가 COMPLETED로 업데이트됩니다.
+
+        **호출 시점**: PayPal JS SDK의 `onApprove` 콜백에서 호출
+      operationId: capturePaymentOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapturePaymentRequest'
+      responses:
+        '200':
+          description: 결제 확정 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "payment captured successfully"
+        '400':
+          description: 잘못된 요청 (orderId 누락)
+        '500':
+          description: 결제 확정 실패 (PayPal API 오류 등)
+
+  /payments/cancel:
+    post:
+      tags: [Payment]
+      summary: 결제 취소 기록
+      description: |
+        사용자가 PayPal 결제를 취소한 경우 취소 사유를 기록합니다.
+        결제 상태는 PENDING을 유지하며, `payment_cancels` 테이블에 별도 기록됩니다.
+
+        **호출 시점**: PayPal JS SDK의 `onCancel` 콜백에서 호출
+      operationId: cancelPaymentOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelPaymentRequest'
+      responses:
+        '200':
+          description: 취소 기록 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "payment cancellation recorded"
+        '400':
+          description: 잘못된 요청 (orderId 누락)
+
 components:
   schemas:
     CloudType:
@@ -636,6 +742,59 @@ components:
         - `dawn`: 새벽 구름 - 희망적이고 새로운 시작
         - `shade`: 그늘 구름 - 차분하고 보호적인 성향
         - `wild`: 야생 구름 - 자유롭고 예측 불가능
+
+    CreatePaymentRequest:
+      type: object
+      required: [userId, amount, currency]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: 결제를 요청하는 사용자 ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        amount:
+          type: string
+          description: 결제 금액 (소수점 2자리)
+          example: "9.99"
+        currency:
+          type: string
+          description: 통화 코드 (ISO 4217)
+          example: "USD"
+
+    CapturePaymentRequest:
+      type: object
+      required: [orderId]
+      properties:
+        orderId:
+          type: string
+          description: PayPal 주문 ID (createOrder에서 반환된 값)
+          example: "5O190127TN364715T"
+
+    CancelPaymentRequest:
+      type: object
+      required: [orderId]
+      properties:
+        orderId:
+          type: string
+          description: PayPal 주문 ID
+          example: "5O190127TN364715T"
+        reason:
+          type: string
+          description: 취소 사유 (선택)
+          example: "사용자가 결제를 취소함"
+
+    CreatePaymentResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          description: 생성된 PayPal 주문 ID
+          example: "5O190127TN364715T"
+        approveUrl:
+          type: string
+          format: uri
+          description: 사용자가 결제를 승인할 PayPal URL
+          example: "https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T"
 
     SignupRequest:
       type: object

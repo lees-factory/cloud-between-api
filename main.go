@@ -10,9 +10,11 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	paypal "io.lees.cloud-between/clients/client-paypal"
 	v1 "io.lees.cloud-between/core/core-api/controller/v1"
 	"io.lees.cloud-between/core/core-domain/chemistry"
 	"io.lees.cloud-between/core/core-domain/diagnosis"
+	"io.lees.cloud-between/core/core-domain/payment"
 	"io.lees.cloud-between/core/core-domain/persona"
 	"io.lees.cloud-between/core/core-domain/premiumcard"
 	"io.lees.cloud-between/core/core-domain/translation"
@@ -68,6 +70,19 @@ func main() {
 	premiumCardFinder := premiumcard.NewPremiumCardFinder(premiumCardRepository)
 	premiumCardService := premiumcard.NewPremiumCardService(premiumCardFinder)
 
+	// Payment (external client + domain)
+	paypalClientID := os.Getenv("PAYPAL_CLIENT_ID")
+	paypalClientSecret := os.Getenv("PAYPAL_CLIENT_SECRET")
+	paypalSandbox := os.Getenv("PAYPAL_SANDBOX") != "false"
+	paypalClient := paypal.NewPayPalClient(paypalClientID, paypalClientSecret, paypalSandbox)
+	paymentGateway := paypal.NewPayPalGatewayAdapter(paypalClient)
+
+	paymentRepository := repository.NewPaymentCoreRepository(db)
+	paymentCancelRepository := repository.NewPaymentCancelCoreRepository(db)
+	paymentAppender := payment.NewPaymentAppender(paymentRepository)
+	paymentUpdater := payment.NewPaymentUpdater(paymentRepository)
+	paymentService := payment.NewPaymentService(paymentGateway, paymentAppender, paymentUpdater, paymentRepository, paymentCancelRepository)
+
 	// Presentation Layer
 	userController := v1.NewUserController(userService)
 	diagnosisController := v1.NewDiagnosisController(diagnosisService)
@@ -75,6 +90,7 @@ func main() {
 	personaProfileController := v1.NewPersonaProfileController(personaProfileService)
 	translationController := v1.NewTranslationController(translationService)
 	premiumCardController := v1.NewPremiumCardController(premiumCardService)
+	paymentController := v1.NewPaymentController(paymentService)
 
 	// Router setup
 	r := gin.Default()
@@ -154,6 +170,13 @@ func main() {
 		{
 			premiumCardGroup.GET("", premiumCardController.GetAll)
 			premiumCardGroup.GET("/:category", premiumCardController.GetByCategory)
+		}
+
+		paymentGroup := apiV1.Group("/payments")
+		{
+			paymentGroup.POST("/create", paymentController.CreateOrder)
+			paymentGroup.POST("/capture", paymentController.CaptureOrder)
+			paymentGroup.POST("/cancel", paymentController.CancelOrder)
 		}
 	}
 

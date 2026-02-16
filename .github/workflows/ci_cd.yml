@@ -56,6 +56,9 @@ jobs:
             "cat > /home/ubuntu/cloud-between-api/.env << 'ENVEOF'
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_SCHEMA=${{ secrets.DB_SCHEMA }}
+          PAYPAL_CLIENT_ID=${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET=${{ secrets.PAYPAL_CLIENT_SECRET }}
+          PAYPAL_SANDBOX=${{ secrets.PAYPAL_SANDBOX }}
           ENVEOF"
 
       - name: Deploy
