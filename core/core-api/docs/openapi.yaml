@@ -177,7 +177,7 @@ paths:
         **프론트엔드 사용 방식**:
         - 각 Step에 포함된 questions 배열에서 랜덤으로 1개의 질문을 선택하여 사용자에게 표시
         - 총 12단계이므로, 사용자는 12개의 질문에 답변하게 됩니다
-        - 각 질문의 선택지(options)에는 score(가중치 맵)가 포함되어 있어 답변 집계에 사용됩니다
+        - 각 질문의 선택지(options)에는 cloudType(구름 유형)이 포함되어 있어 답변 집계에 사용됩니다
 
         **인증**: 불필요 (비회원도 조회 가능)
       operationId: getQuestions
@@ -209,24 +209,24 @@ paths:
                       text: "마음이 가는 사람을 발견했을 때, 당신의 첫 움직임은?"
                       options:
                         - text: "먼저 다가가 따스한 대화를 건넨다"
-                          score: { "sunlit": 2 }
+                          cloudType: "sunlit"
                         - text: "상대의 결을 살피며 조용히 기다린다"
-                          score: { "mist": 2 }
+                          cloudType: "mist"
                         - text: "강렬한 이끌림을 숨기지 않고 표현한다"
-                          score: { "storm": 2 }
+                          cloudType: "storm"
                         - text: "자연스럽게 곁에 스며들어 친구가 된다"
-                          score: { "dawn": 2 }
+                          cloudType: "dawn"
 
   /diagnosis/analyze:
     post:
       tags: [Diagnosis]
       summary: 답변 기반 구름 유형 진단
       description: |
-        사용자의 답변(12개)을 분석하여 가중치 합산 기반으로 구름 유형(cloudType)을 결과로 반환합니다.
+        사용자의 답변(12개)을 분석하여 cloudType 빈도 기반으로 구름 유형을 결과로 반환합니다.
 
         **진단 로직**:
-        1. 각 답변의 score 맵에서 cloudType별 가중치를 합산합니다
-        2. 가장 높은 합산 점수를 가진 cloudType이 최종 결과가 됩니다
+        1. 각 답변의 cloudType을 카운트합니다
+        2. 가장 많이 선택된 cloudType이 최종 결과가 됩니다
         3. 결과의 personaType 필드로 반환됩니다
 
         **결과 저장**:
@@ -255,44 +255,44 @@ paths:
               answers:
                 - questionId: 1
                   optionId: 1
-                  score: { "sunlit": 2 }
+                  cloudType: "sunlit"
                 - questionId: 5
                   optionId: 2
-                  score: { "mist": 2 }
+                  cloudType: "mist"
                 - questionId: 9
                   optionId: 1
-                  score: { "sunlit": 2 }
+                  cloudType: "sunlit"
                 - questionId: 13
                   optionId: 3
-                  score: { "storm": 2 }
+                  cloudType: "storm"
                 - questionId: 17
                   optionId: 1
-                  score: { "sunlit": 2 }
+                  cloudType: "sunlit"
                 - questionId: 21
                   optionId: 4
-                  score: { "dawn": 2 }
+                  cloudType: "dawn"
                 - questionId: 25
                   optionId: 1
-                  score: { "sunlit": 2 }
+                  cloudType: "sunlit"
                 - questionId: 29
                   optionId: 4
-                  score: { "shade": 2 }
+                  cloudType: "shade"
                 - questionId: 33
                   optionId: 3
-                  score: { "wild": 2 }
+                  cloudType: "wild"
                 - questionId: 37
                   optionId: 1
-                  score: { "sunlit": 2 }
+                  cloudType: "sunlit"
                 - questionId: 41
                   optionId: 2
-                  score: { "mist": 2 }
+                  cloudType: "mist"
                 - questionId: 45
                   optionId: 1
-                  score: { "sunlit": 2 }
+                  cloudType: "sunlit"
       responses:
         '200':
           description: |
-            진단 결과 반환. personaType 필드에 가중치 합산 점수가 가장 높은 구름 유형이 담깁니다.
+            진단 결과 반환. personaType 필드에 가장 많이 선택된 구름 유형이 담깁니다.
             이 값으로 `/personas/profiles/{typeKey}` API를 호출하면 상세 프로필을 확인할 수 있습니다.
           content:
             application/json:
@@ -918,7 +918,7 @@ components:
 
     QuestionResponse:
       type: object
-      description: 개별 질문. 각 질문에는 4개의 선택지가 포함되며, 각 선택지는 score(가중치 맵)를 통해 구름 유형과 매핑됩니다.
+      description: 개별 질문. 각 질문에는 4개의 선택지가 포함되며, 각 선택지는 cloudType을 통해 구름 유형과 매핑됩니다.
       properties:
         id:
           type: integer
@@ -936,25 +936,21 @@ components:
 
     OptionResponse:
       type: object
-      description: 질문의 선택지. 각 선택지를 선택하면 score 맵의 가중치가 해당 구름 유형에 합산됩니다.
+      description: 질문의 선택지. 각 선택지를 선택하면 해당 cloudType이 카운트됩니다.
       properties:
         text:
           type: string
           description: 선택지 텍스트
           example: "먼저 다가가 따스한 대화를 건넨다"
-        score:
-          type: object
-          description: 구름 유형별 가중치 맵. 키는 cloudType, 값은 가중치 점수
-          additionalProperties:
-            type: integer
-          example: { "sunlit": 2 }
+        cloudType:
+          $ref: '#/components/schemas/CloudType'
 
     DiagnosisRequest:
       type: object
       required: [answers]
       description: |
         진단 분석 요청. 12개의 답변(각 단계에서 1개씩)을 배열로 전달합니다.
-        각 답변에는 선택한 질문의 ID, 선택지 ID, 해당 선택지의 score(가중치 맵)를 포함합니다.
+        각 답변에는 선택한 질문의 ID, 선택지 ID, 해당 선택지의 cloudType을 포함합니다.
       properties:
         answers:
           type: array
@@ -966,8 +962,8 @@ components:
 
     UserAnswer:
       type: object
-      required: [questionId, optionId, score]
-      description: 개별 답변. 어떤 질문에서 어떤 선택지를 골랐고, 해당 선택지의 가중치 점수를 포함합니다.
+      required: [questionId, optionId, cloudType]
+      description: 개별 답변. 어떤 질문에서 어떤 선택지를 골랐고, 해당 선택지의 구름 유형을 포함합니다.
       properties:
         questionId:
           type: integer
@@ -977,17 +973,13 @@ components:
           type: integer
           description: 선택한 선택지 ID (1~4)
           example: 1
-        score:
-          type: object
-          description: 선택한 선택지의 구름 유형별 가중치 맵
-          additionalProperties:
-            type: integer
-          example: { "sunlit": 2 }
+        cloudType:
+          $ref: '#/components/schemas/CloudType'
 
     DiagnosisResult:
       type: object
       description: |
-        진단 결과. 12개의 답변에서 가중치 합산 점수가 가장 높은 구름 유형이 최종 결과로 반환됩니다.
+        진단 결과. 12개의 답변에서 가장 많이 선택된 구름 유형이 최종 결과로 반환됩니다.
         이 personaType 값으로 `/personas/profiles/{typeKey}` API를 호출하면 상세 프로필을 확인할 수 있습니다.
       properties:
         personaType:
