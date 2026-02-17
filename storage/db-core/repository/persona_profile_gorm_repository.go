@@ -18,53 +18,70 @@ func NewPersonaProfileCoreRepository(db *gorm.DB) domain.PersonaProfileRepositor
 }
 
 func (r *PersonaProfileGormRepository) FindAllByLocale(ctx context.Context, locale string) ([]domain.PersonaProfile, error) {
-	var entities []entity.PersonaProfileEntity
-	err := r.db.WithContext(ctx).
-		Where("locale = ?", locale).
-		Find(&entities).Error
+	var entities []entity.PersonMasterEntity
+	err := r.db.WithContext(ctx).Find(&entities).Error
 	if err != nil {
 		return nil, err
 	}
 
 	profiles := make([]domain.PersonaProfile, len(entities))
 	for i, e := range entities {
-		profiles[i] = toPersonaDomain(e)
+		profiles[i] = toPersonaDomain(e, locale)
 	}
 	return profiles, nil
 }
 
 func (r *PersonaProfileGormRepository) FindByTypeKeyAndLocale(ctx context.Context, typeKey string, locale string) (*domain.PersonaProfile, error) {
-	var e entity.PersonaProfileEntity
+	var e entity.PersonMasterEntity
 	err := r.db.WithContext(ctx).
-		Where("type_key = ? AND locale = ?", typeKey, locale).
+		Where("type_key = ?", typeKey).
 		First(&e).Error
 	if err != nil {
 		return nil, err
 	}
 
-	profile := toPersonaDomain(e)
+	profile := toPersonaDomain(e, locale)
 	return &profile, nil
 }
 
-func toPersonaDomain(e entity.PersonaProfileEntity) domain.PersonaProfile {
+func toPersonaDomain(e entity.PersonMasterEntity, locale string) domain.PersonaProfile {
 	return domain.PersonaProfile{
 		TypeKey:   e.TypeKey,
-		Locale:    e.Locale,
+		Locale:    locale,
 		Emoji:     e.Emoji,
-		Name:      e.Name,
-		Subtitle:  e.Subtitle,
-		Keywords:  unmarshalPersonaStrings(e.Keywords),
-		Lore:      e.Lore,
-		Strengths: unmarshalPersonaStrings(e.Strengths),
-		Shadows:   unmarshalPersonaStrings(e.Shadows),
+		Name:      extractLocalizedString(e.Name, locale),
+		Subtitle:  extractLocalizedString(e.Subtitle, locale),
+		Keywords:  extractLocalizedStrings(e.Keywords, locale),
+		Lore:      extractLocalizedString(e.Lore, locale),
+		Strengths: extractLocalizedStrings(e.Strengths, locale),
+		Shadows:   extractLocalizedStrings(e.Shadows, locale),
 	}
 }
 
-func unmarshalPersonaStrings(data entity.JSONB) []string {
+func extractLocalizedString(data entity.JSONB, locale string) string {
+	if data == nil {
+		return ""
+	}
+	var m map[string]string
+	if err := json.Unmarshal(data, &m); err != nil {
+		return ""
+	}
+	if v, ok := m[locale]; ok {
+		return v
+	}
+	return m["ko"]
+}
+
+func extractLocalizedStrings(data entity.JSONB, locale string) []string {
 	if data == nil {
 		return nil
 	}
-	var result []string
-	_ = json.Unmarshal(data, &result)
-	return result
+	var m map[string][]string
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil
+	}
+	if v, ok := m[locale]; ok {
+		return v
+	}
+	return m["ko"]
 }

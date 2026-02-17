@@ -52,9 +52,11 @@ tags:
     description: |
       궁합 API.
       두 구름 유형 간의 관계성과 궁합 정보를 제공합니다.
-      36가지 조합(15개 기본 + 6개 동일타입 + 15개 역방향)에 대해 하늘 이름, 현상, 서사, 주의사항,
-      그리고 content JSONB(storyBeats, vibeTags, phenomenonName, premium 등) 데이터를 반환합니다.
-      예: sunlit + mist = "Morning Light Through Fog" (아침 안개 속의 햇살)
+      person_master 테이블의 pair_meta JSONB 컬럼에서 상대 유형별 궁합 데이터를 추출합니다.
+      각 궁합에는 하늘 이름(skyName), 현상(phenomenon), 서사(narrative), 주의사항(warning),
+      그리고 상세 컨텐츠(phenomenonName, vibeTags, storyBeats, premium)가 포함됩니다.
+      locale 파라미터로 다국어(ko/en) 지원.
+      예: sunlit→mist = "아침 안개 속의 햇살" (locale=ko)
   - name: PremiumCard
     description: |
       프리미엄 카드 템플릿 API.
@@ -175,7 +177,7 @@ paths:
         **프론트엔드 사용 방식**:
         - 각 Step에 포함된 questions 배열에서 랜덤으로 1개의 질문을 선택하여 사용자에게 표시
         - 총 12단계이므로, 사용자는 12개의 질문에 답변하게 됩니다
-        - 각 질문의 선택지(options)에는 cloudType이 포함되어 있어 답변 집계에 사용됩니다
+        - 각 질문의 선택지(options)에는 score(가중치 맵)가 포함되어 있어 답변 집계에 사용됩니다
 
         **인증**: 불필요 (비회원도 조회 가능)
       operationId: getQuestions
@@ -200,38 +202,31 @@ paths:
                   $ref: '#/components/schemas/StepResponse'
               example:
                 - id: 1
-                  title: "감정 표현"
-                  emoji: "💭"
+                  title: "첫 빛이 드는 순간"
+                  emoji: "🌅"
                   questions:
                     - id: 1
-                      text: "기분이 안 좋을 때 나는..."
+                      text: "마음이 가는 사람을 발견했을 때, 당신의 첫 움직임은?"
                       options:
-                        - text: "밝은 척 웃으며 넘긴다"
-                          cloudType: "sunlit"
-                        - text: "혼자 조용히 삭인다"
-                          cloudType: "mist"
-                        - text: "화를 바로 표현한다"
-                          cloudType: "storm"
-                        - text: "일기에 쓰거나 정리한다"
-                          cloudType: "dawn"
-                    - id: 2
-                      text: "감정을 표현할 때 나는..."
-                      options:
-                        - text: "표정으로 다 드러난다"
-                          cloudType: "sunlit"
-                        - text: "글이나 예술로 표현한다"
-                          cloudType: "mist"
+                        - text: "먼저 다가가 따스한 대화를 건넨다"
+                          score: { "sunlit": 2 }
+                        - text: "상대의 결을 살피며 조용히 기다린다"
+                          score: { "mist": 2 }
+                        - text: "강렬한 이끌림을 숨기지 않고 표현한다"
+                          score: { "storm": 2 }
+                        - text: "자연스럽게 곁에 스며들어 친구가 된다"
+                          score: { "dawn": 2 }
 
   /diagnosis/analyze:
     post:
       tags: [Diagnosis]
       summary: 답변 기반 구름 유형 진단
       description: |
-        사용자의 답변(12개)을 분석하여 가장 많이 선택된 구름 유형(cloudType)을 결과로 반환합니다.
+        사용자의 답변(12개)을 분석하여 가중치 합산 기반으로 구름 유형(cloudType)을 결과로 반환합니다.
 
         **진단 로직**:
-        1. 각 답변의 cloudType을 집계합니다
-        2. 가장 많이 선택된 cloudType이 최종 결과가 됩니다
+        1. 각 답변의 score 맵에서 cloudType별 가중치를 합산합니다
+        2. 가장 높은 합산 점수를 가진 cloudType이 최종 결과가 됩니다
         3. 결과의 personaType 필드로 반환됩니다
 
         **결과 저장**:
@@ -259,33 +254,45 @@ paths:
             example:
               answers:
                 - questionId: 1
-                  cloudType: "sunlit"
+                  optionId: 1
+                  score: { "sunlit": 2 }
                 - questionId: 5
-                  cloudType: "mist"
+                  optionId: 2
+                  score: { "mist": 2 }
                 - questionId: 9
-                  cloudType: "sunlit"
+                  optionId: 1
+                  score: { "sunlit": 2 }
                 - questionId: 13
-                  cloudType: "storm"
+                  optionId: 3
+                  score: { "storm": 2 }
                 - questionId: 17
-                  cloudType: "sunlit"
+                  optionId: 1
+                  score: { "sunlit": 2 }
                 - questionId: 21
-                  cloudType: "dawn"
+                  optionId: 4
+                  score: { "dawn": 2 }
                 - questionId: 25
-                  cloudType: "sunlit"
+                  optionId: 1
+                  score: { "sunlit": 2 }
                 - questionId: 29
-                  cloudType: "shade"
+                  optionId: 4
+                  score: { "shade": 2 }
                 - questionId: 33
-                  cloudType: "wild"
+                  optionId: 3
+                  score: { "wild": 2 }
                 - questionId: 37
-                  cloudType: "sunlit"
+                  optionId: 1
+                  score: { "sunlit": 2 }
                 - questionId: 41
-                  cloudType: "mist"
+                  optionId: 2
+                  score: { "mist": 2 }
                 - questionId: 45
-                  cloudType: "sunlit"
+                  optionId: 1
+                  score: { "sunlit": 2 }
       responses:
         '200':
           description: |
-            진단 결과 반환. personaType 필드에 가장 많이 선택된 구름 유형이 담깁니다.
+            진단 결과 반환. personaType 필드에 가중치 합산 점수가 가장 높은 구름 유형이 담깁니다.
             이 값으로 `/personas/profiles/{typeKey}` API를 호출하면 상세 프로필을 확인할 수 있습니다.
           content:
             application/json:
@@ -299,25 +306,35 @@ paths:
   /chemistries:
     get:
       tags: [Chemistry]
-      summary: 전체 궁합 목록 조회 (36개 조합)
+      summary: 전체 궁합 목록 조회
       description: |
-        6가지 구름 유형 간 모든 궁합 조합(36개)을 반환합니다.
+        6가지 구름 유형 간 모든 궁합 조합을 반환합니다.
+        person_master 테이블의 pair_meta JSONB에서 추출됩니다.
 
-        **조합 수**: 15개 기본 + 6개 동일타입 + 15개 역방향 = 36가지
-        - 기본: sunlit-mist, sunlit-storm 등 (방향성 있는 서사)
-        - 동일: sunlit-sunlit, mist-mist 등
-        - 역방향: mist-sunlit, storm-sunlit 등 (역방향 관점의 서사)
+        각 페르소나(6개)의 pair_meta에 상대 유형별 궁합 데이터가 저장되어 있으므로,
+        방향성이 있는 전체 조합이 반환됩니다. (예: sunlit→mist, mist→sunlit 각각 존재)
 
-        각 궁합에는 하늘 이름(skyName/skyNameKo), 자연 현상(phenomenon),
+        각 궁합에는 하늘 이름(skyName), 자연 현상(phenomenon),
         서사(narrative), 주의사항(warning), 그리고 상세 컨텐츠(phenomenonName, vibeTags, storyBeats, premium)가 포함됩니다.
+        skyName, narrative, warning은 locale 파라미터에 따라 해당 언어로 반환됩니다.
 
         **사용 사례**:
         - 전체 궁합표 렌더링
         - 궁합 카드 리스트 화면
       operationId: getAllChemistries
+      parameters:
+        - name: locale
+          in: query
+          description: |
+            다국어 코드. 해당 언어로 작성된 궁합 컨텐츠를 반환합니다.
+            현재 지원: `ko` (한국어), `en` (영어)
+          schema:
+            type: string
+            default: ko
+            enum: [ko, en]
       responses:
         '200':
-          description: 전체 궁합 목록 (36개)
+          description: 전체 궁합 목록
           content:
             application/json:
               schema:
@@ -327,8 +344,7 @@ paths:
               example:
                 - personaType1: "sunlit"
                   personaType2: "mist"
-                  skyName: "Morning Light Through Fog"
-                  skyNameKo: "아침 안개 속의 햇살"
+                  skyName: "아침 안개 속의 햇살"
                   phenomenon: "glow"
                   narrative: "햇살은 조용히 안개 곁에 머문다..."
                   warning: "빛이 서두르면, 안개는 숨을 곳을 찾는다."
@@ -345,7 +361,9 @@ paths:
       summary: 두 구름 유형의 궁합 조회
       description: |
         특정 두 구름 유형의 궁합 정보를 조회합니다.
-        type1과 type2의 순서는 무관합니다 (sunlit+mist = mist+sunlit).
+        type1의 person_master 행에서 pair_meta[type2]를 추출하여 반환합니다.
+        type1과 type2의 순서에 따라 방향성 있는 서사가 달라집니다.
+        (sunlit→mist와 mist→sunlit은 서로 다른 관점의 서사)
 
         **사용 사례**:
         - 진단 결과 후 친구와의 궁합 확인
@@ -355,7 +373,7 @@ paths:
         - name: type1
           in: query
           required: true
-          description: 첫 번째 구름 유형
+          description: 첫 번째 구름 유형 (내 관점)
           schema:
             type: string
             enum: [sunlit, mist, storm, dawn, shade, wild]
@@ -363,11 +381,20 @@ paths:
         - name: type2
           in: query
           required: true
-          description: 두 번째 구름 유형
+          description: 두 번째 구름 유형 (상대방)
           schema:
             type: string
             enum: [sunlit, mist, storm, dawn, shade, wild]
           example: mist
+        - name: locale
+          in: query
+          description: |
+            다국어 코드. 해당 언어로 작성된 궁합 컨텐츠를 반환합니다.
+            현재 지원: `ko` (한국어), `en` (영어)
+          schema:
+            type: string
+            default: ko
+            enum: [ko, en]
       responses:
         '200':
           description: 궁합 결과 반환
@@ -891,7 +918,7 @@ components:
 
     QuestionResponse:
       type: object
-      description: 개별 질문. 각 질문에는 4개의 선택지가 포함되며, 각 선택지는 특정 구름 유형과 매핑됩니다.
+      description: 개별 질문. 각 질문에는 4개의 선택지가 포함되며, 각 선택지는 score(가중치 맵)를 통해 구름 유형과 매핑됩니다.
       properties:
         id:
           type: integer
@@ -909,21 +936,25 @@ components:
 
     OptionResponse:
       type: object
-      description: 질문의 선택지. 각 선택지를 선택하면 해당 cloudType에 1점이 부여됩니다.
+      description: 질문의 선택지. 각 선택지를 선택하면 score 맵의 가중치가 해당 구름 유형에 합산됩니다.
       properties:
         text:
           type: string
           description: 선택지 텍스트
-          example: "밝은 척 웃으며 넘긴다"
-        cloudType:
-          $ref: '#/components/schemas/CloudType'
+          example: "먼저 다가가 따스한 대화를 건넨다"
+        score:
+          type: object
+          description: 구름 유형별 가중치 맵. 키는 cloudType, 값은 가중치 점수
+          additionalProperties:
+            type: integer
+          example: { "sunlit": 2 }
 
     DiagnosisRequest:
       type: object
       required: [answers]
       description: |
         진단 분석 요청. 12개의 답변(각 단계에서 1개씩)을 배열로 전달합니다.
-        각 답변에는 선택한 질문의 ID와 해당 선택지의 cloudType을 포함합니다.
+        각 답변에는 선택한 질문의 ID, 선택지 ID, 해당 선택지의 score(가중치 맵)를 포함합니다.
       properties:
         answers:
           type: array
@@ -935,20 +966,28 @@ components:
 
     UserAnswer:
       type: object
-      required: [questionId, cloudType]
-      description: 개별 답변. 어떤 질문에서 어떤 구름 유형을 선택했는지를 나타냅니다.
+      required: [questionId, optionId, score]
+      description: 개별 답변. 어떤 질문에서 어떤 선택지를 골랐고, 해당 선택지의 가중치 점수를 포함합니다.
       properties:
         questionId:
           type: integer
           description: 응답한 질문의 ID
           example: 1
-        cloudType:
-          $ref: '#/components/schemas/CloudType'
+        optionId:
+          type: integer
+          description: 선택한 선택지 ID (1~4)
+          example: 1
+        score:
+          type: object
+          description: 선택한 선택지의 구름 유형별 가중치 맵
+          additionalProperties:
+            type: integer
+          example: { "sunlit": 2 }
 
     DiagnosisResult:
       type: object
       description: |
-        진단 결과. 12개의 답변에서 가장 많이 선택된 구름 유형이 최종 결과로 반환됩니다.
+        진단 결과. 12개의 답변에서 가중치 합산 점수가 가장 높은 구름 유형이 최종 결과로 반환됩니다.
         이 personaType 값으로 `/personas/profiles/{typeKey}` API를 호출하면 상세 프로필을 확인할 수 있습니다.
       properties:
         personaType:
@@ -958,8 +997,10 @@ components:
       type: object
       description: |
         두 구름 유형 간의 궁합 정보.
+        person_master 테이블의 pair_meta JSONB에서 추출됩니다.
         두 유형이 만났을 때 어떤 하늘이 펼쳐지는지를 자연 현상 메타포로 표현합니다.
-        content JSONB에서 추출한 상세 데이터(phenomenonName, vibeTags, storyBeats, premium)도 포함됩니다.
+        skyName, narrative, warning은 locale에 따라 해당 언어로 반환됩니다.
+        phenomenonName, vibeTags, storyBeats, premium은 원본 다국어 JSONB 그대로 반환됩니다.
       properties:
         personaType1:
           $ref: '#/components/schemas/CloudType'
@@ -967,11 +1008,7 @@ components:
           $ref: '#/components/schemas/CloudType'
         skyName:
           type: string
-          description: 두 구름이 만들어내는 하늘의 영어 이름
-          example: "Morning Light Through Fog"
-        skyNameKo:
-          type: string
-          description: 두 구름이 만들어내는 하늘의 한국어 이름 (없을 수 있음)
+          description: 두 구름이 만들어내는 하늘 이름 (locale에 따라 해당 언어로 반환)
           example: "아침 안개 속의 햇살"
         phenomenon:
           type: string
@@ -979,15 +1016,15 @@ components:
           example: "glow"
         narrative:
           type: string
-          description: 두 유형의 관계에 대한 서사적 설명
+          description: 두 유형의 관계에 대한 서사적 설명 (locale에 따라 해당 언어로 반환)
           example: "햇살은 조용히 안개 곁에 머문다.\n안개는 서서히 마음의 결을 드러내고,\n햇살은 그 결을 지켜주고 싶어진다."
         warning:
           type: string
-          description: 이 궁합에서 주의해야 할 점 (없을 수 있음)
+          description: 이 궁합에서 주의해야 할 점 (locale에 따라 해당 언어로 반환, 없을 수 있음)
           example: "빛이 서두르면, 안개는 숨을 곳을 찾는다."
         phenomenonName:
           type: object
-          description: 현상 이름 (다국어)
+          description: 현상 이름 (다국어 JSONB 원본)
           properties:
             en:
               type: string

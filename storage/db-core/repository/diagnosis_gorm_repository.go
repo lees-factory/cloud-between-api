@@ -19,50 +19,77 @@ func NewDiagnosisCoreRepository(db *gorm.DB) domain.DiagnosisRepository {
 }
 
 func (r *DiagnosisGormRepository) FindAllStepsWithQuestions(ctx context.Context, locale string) ([]domain.Step, error) {
-	// 1. Fetch steps
-	var stepEntities []entity.StepEntity
+	var masters []entity.TestQuestionMasterEntity
 	err := r.db.WithContext(ctx).
-		Where("locale = ?", locale).
-		Order("order_index asc").
-		Find(&stepEntities).Error
+		Order("step_index asc, order_index asc").
+		Find(&masters).Error
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. Fetch questions
-	var questionEntities []entity.QuestionEntity
-	err = r.db.WithContext(ctx).
-		Where("locale = ?", locale).
-		Order("order_index asc").
-		Find(&questionEntities).Error
-	if err != nil {
-		return nil, err
+	type rawOption struct {
+		ID    int               `json:"id"`
+		Text  map[string]string `json:"text"`
+		Score map[string]int    `json:"score"`
 	}
 
-	// 3. Group questions by step_id
-	questionsByStep := make(map[int][]domain.Question)
-	for _, e := range questionEntities {
-		var options []domain.Option
-		_ = json.Unmarshal(e.Options, &options)
+	stepMap := make(map[int]*domain.Step)
+	var stepOrder []int
 
-		questionsByStep[e.StepID] = append(questionsByStep[e.StepID], domain.Question{
-			ID:           e.ID,
-			StepID:       e.StepID,
-			QuestionText: e.QuestionText,
+	for _, m := range masters {
+		// Extract localized step title
+		var titleMap map[string]string
+		_ = json.Unmarshal(m.StepTitle, &titleMap)
+		title := titleMap[locale]
+		if title == "" {
+			title = titleMap["ko"]
+		}
+
+		// Extract localized question text
+		var textMap map[string]string
+		_ = json.Unmarshal(m.QuestionText, &textMap)
+		qText := textMap[locale]
+		if qText == "" {
+			qText = textMap["ko"]
+		}
+
+		// Parse options with locale extraction
+		var rawOpts []rawOption
+		_ = json.Unmarshal(m.Options, &rawOpts)
+
+		options := make([]domain.Option, len(rawOpts))
+		for i, ro := range rawOpts {
+			optText := ro.Text[locale]
+			if optText == "" {
+				optText = ro.Text["ko"]
+			}
+			options[i] = domain.Option{
+				Text:  optText,
+				Score: ro.Score,
+			}
+		}
+
+		if _, exists := stepMap[m.StepIndex]; !exists {
+			stepMap[m.StepIndex] = &domain.Step{
+				ID:    m.StepIndex,
+				Title: title,
+				Emoji: m.StepEmoji,
+			}
+			stepOrder = append(stepOrder, m.StepIndex)
+		}
+
+		stepMap[m.StepIndex].Questions = append(stepMap[m.StepIndex].Questions, domain.Question{
+			ID:           m.ID,
+			StepID:       m.StepIndex,
+			QuestionText: qText,
 			Options:      options,
-			OrderIndex:   e.OrderIndex,
+			OrderIndex:   m.OrderIndex,
 		})
 	}
 
-	// 4. Build steps with questions
-	steps := make([]domain.Step, len(stepEntities))
-	for i, s := range stepEntities {
-		steps[i] = domain.Step{
-			ID:        s.ID,
-			Title:     s.Title,
-			Emoji:     s.Emoji,
-			Questions: questionsByStep[s.ID],
-		}
+	steps := make([]domain.Step, 0, len(stepOrder))
+	for _, idx := range stepOrder {
+		steps = append(steps, *stepMap[idx])
 	}
 
 	return steps, nil

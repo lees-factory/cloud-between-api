@@ -17,15 +17,20 @@ func (s *DiagnosisService) GetSteps(ctx context.Context, locale string) ([]Step,
 }
 
 func (s *DiagnosisService) CalculateResult(ctx context.Context, userID *string, answers []UserAnswer) (*DiagnosisResult, error) {
-	counts := make(map[string]int)
-	maxCount := 0
-	dominantType := ""
+	scores := make(map[string]int)
 
 	for _, ans := range answers {
-		counts[ans.CloudType]++
-		if counts[ans.CloudType] > maxCount {
-			maxCount = counts[ans.CloudType]
-			dominantType = ans.CloudType
+		for cloudType, weight := range ans.Score {
+			scores[cloudType] += weight
+		}
+	}
+
+	maxScore := 0
+	dominantType := ""
+	for cloudType, score := range scores {
+		if score > maxScore {
+			maxScore = score
+			dominantType = cloudType
 		}
 	}
 

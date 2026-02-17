@@ -19,13 +19,14 @@ func NewChemistryController(service *chemistry.ChemistryService) *ChemistryContr
 func (ctrl *ChemistryController) GetChemistry(c *gin.Context) {
 	type1 := c.Query("type1")
 	type2 := c.Query("type2")
+	locale := c.DefaultQuery("locale", "ko")
 
 	if type1 == "" || type2 == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "type1 and type2 are required"})
 		return
 	}
 
-	result, err := ctrl.service.GetChemistry(c.Request.Context(), type1, type2)
+	result, err := ctrl.service.GetChemistry(c.Request.Context(), type1, type2, locale)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "chemistry not found"})
 		return
@@ -35,7 +36,9 @@ func (ctrl *ChemistryController) GetChemistry(c *gin.Context) {
 }
 
 func (ctrl *ChemistryController) GetAllChemistries(c *gin.Context) {
-	results, err := ctrl.service.GetAllChemistries(c.Request.Context())
+	locale := c.DefaultQuery("locale", "ko")
+
+	results, err := ctrl.service.GetAllChemistries(c.Request.Context(), locale)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -53,7 +56,6 @@ type chemistryResponse struct {
 	PersonaType1   string                 `json:"personaType1"`
 	PersonaType2   string                 `json:"personaType2"`
 	SkyName        string                 `json:"skyName"`
-	SkyNameKo      string                 `json:"skyNameKo,omitempty"`
 	Phenomenon     string                 `json:"phenomenon"`
 	Narrative      string                 `json:"narrative"`
 	Warning        string                 `json:"warning,omitempty"`
@@ -68,7 +70,6 @@ func toChemistryResponse(c chemistry.Chemistry) chemistryResponse {
 		PersonaType1: c.PersonaType1,
 		PersonaType2: c.PersonaType2,
 		SkyName:      c.SkyName,
-		SkyNameKo:    c.SkyNameKo,
 		Phenomenon:   c.Phenomenon,
 		Narrative:    c.Narrative,
 		Warning:      c.Warning,

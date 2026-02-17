@@ -20,13 +20,14 @@ type Question struct {
 }
 
 type Option struct {
-	Text      string `json:"text"`
-	CloudType string `json:"cloudType"`
+	Text  string         `json:"text"`
+	Score map[string]int `json:"score"`
 }
 
 type UserAnswer struct {
-	QuestionID int    `json:"questionId"`
-	CloudType  string `json:"cloudType"`
+	QuestionID int            `json:"questionId"`
+	OptionID   int            `json:"optionId"`
+	Score      map[string]int `json:"score"`
 }
 
 type DiagnosisResult struct {

@@ -8,31 +8,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// StepEntity for test_steps table
-type StepEntity struct {
-	ID         int    `gorm:"primaryKey"`
-	Title      string `gorm:"not null"`
-	Emoji      string
-	OrderIndex int
-	Locale     string `gorm:"default:ko"`
+// TestQuestionMasterEntity for test_question_master table
+type TestQuestionMasterEntity struct {
+	ID           int    `gorm:"primaryKey"`
+	StepIndex    int    `gorm:"column:step_index;not null"`
+	StepTitle    JSONB  `gorm:"column:step_title;type:jsonb;not null"`
+	StepEmoji    string `gorm:"column:step_emoji;not null"`
+	QuestionText JSONB  `gorm:"column:question_text;type:jsonb;not null"`
+	Options      JSONB  `gorm:"column:options;type:jsonb;not null"`
+	OrderIndex   int    `gorm:"column:order_index"`
 }
 
-func (StepEntity) TableName() string {
-	return "cloud_between.test_steps"
-}
-
-// QuestionEntity for test_questions table
-type QuestionEntity struct {
-	ID           int    `gorm:"primaryKey;autoIncrement"`
-	StepID       int    `gorm:"not null"`
-	QuestionText string `gorm:"not null"`
-	Options      JSONB  `gorm:"type:jsonb;not null"`
-	Locale       string `gorm:"default:ko"`
-	OrderIndex   int
-}
-
-func (QuestionEntity) TableName() string {
-	return "cloud_between.test_questions"
+func (TestQuestionMasterEntity) TableName() string {
+	return "cloud_between.test_question_master"
 }
 
 // UserTestResultEntity for user_test_results table
