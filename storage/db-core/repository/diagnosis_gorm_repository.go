@@ -28,9 +28,9 @@ func (r *DiagnosisGormRepository) FindAllStepsWithQuestions(ctx context.Context,
 	}
 
 	type rawOption struct {
-		ID    int               `json:"id"`
-		Text  map[string]string `json:"text"`
-		Score map[string]int    `json:"score"`
+		ID        int               `json:"id"`
+		Text      map[string]string `json:"text"`
+		CloudType string            `json:"cloudType"`
 	}
 
 	stepMap := make(map[int]*domain.Step)
@@ -64,8 +64,8 @@ func (r *DiagnosisGormRepository) FindAllStepsWithQuestions(ctx context.Context,
 				optText = ro.Text["ko"]
 			}
 			options[i] = domain.Option{
-				Text:  optText,
-				Score: ro.Score,
+				Text:      optText,
+				CloudType: ro.CloudType,
 			}
 		}
 

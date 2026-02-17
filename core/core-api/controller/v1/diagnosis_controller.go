@@ -30,8 +30,8 @@ func (ctrl *DiagnosisController) GetQuestions(c *gin.Context) {
 			options := make([]optionResponse, len(q.Options))
 			for k, o := range q.Options {
 				options[k] = optionResponse{
-					Text:  o.Text,
-					Score: o.Score,
+					Text:      o.Text,
+					CloudType: o.CloudType,
 				}
 			}
 			questions[j] = questionResponse{
@@ -90,6 +90,6 @@ type questionResponse struct {
 }
 
 type optionResponse struct {
-	Text  string         `json:"text"`
-	Score map[string]int `json:"score"`
+	Text      string `json:"text"`
+	CloudType string `json:"cloudType"`
 }
